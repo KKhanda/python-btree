@@ -42,6 +42,8 @@ class BTreeNode(object):
     #     return 'Internal node with\n\tkeys: {0}\n\tand children with keys: {1}\n'.format(self.keys,
     #                                                                                      [child.keys for child in
     #                                                                                       self.children])
+
+
 """
 B-Tree properties:
 * all leaves are at the same level
@@ -140,6 +142,8 @@ class BTree(object):
             # decreasing index
             while index >= 0 and key < node.keys[index]:
                 index -= 1
+            if index == 0 and len(node.children) > 2:
+                index += 1
             # if child is full, split the node
             if len(node.children[index].keys) == (2 * self.min_degree - 1):
                 self._children_split(node, index)
@@ -172,5 +176,7 @@ class BTree(object):
 
 b_tree = BTree(2)
 for i in range(0, 100):
-    b_tree.insert(randint(0, 150))
-print(b_tree)
+    b_tree.insert(randint(100, 10000))
+print(str(b_tree) + '\n')
+# result = b_tree.search(10, None)
+# print(result)
