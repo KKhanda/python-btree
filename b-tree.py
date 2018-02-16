@@ -3,28 +3,72 @@
     Resources, which were used during this implementation: https://www.geeksforgeeks.org/b-tree-set-1-introduction-2/
 """
 from random import randint
+import time
 
 
 class BTreeNode(object):
+
     """
     BTreeNode constructor, where
     * is_leaf - shows is current node is leaf node
     * keys - slice with keys stored inside current node
     * children - slice with children of current node
     """
-
-    def __init__(self, is_leaf):
+    def __init__(self, min_degree, is_leaf):
         self.is_leaf = is_leaf
         self.keys = []
         self.children = []
 
     """
-    Override method '__str__' for node representation
+    Method to split a given node by child index
+    * node - node, which should be splitted
+    * index - child index 
     """
+    def children_split(self, min_degree, node, index):
+        # processing new node
+        new_node = BTreeNode(min_degree, node.is_leaf)
+        new_node.keys = node.keys[min_degree:(2 * min_degree - 1)]
 
-    # def __str__(self):
-    #     return 'node with keys: {0} and children: \n\t{1}'\
-    #                .format(self.keys, [child.__str__() for child in self.children])
+        j = 0
+        if not node.is_leaf:
+            while j < min_degree:
+                new_node.children.insert(j, node.children[j + min_degree])
+                j += 1
+
+        j = len(self.keys)
+        while j >= index + 1:
+            self.children.insert(j + 1, self.children[j])
+            j -= 1
+
+        self.children.insert(index + 1, new_node)
+
+        j = len(self.keys) - 1
+        while j >= index:
+            self.keys.insert(j + 1, self.keys[j])
+            j -= 1
+
+        self.keys.insert(index, node.keys[min_degree - 1])
+
+    """
+    Method to insert a key into a not full node
+    * node - node, in which the key is inserted
+    * key - key for insertion
+    """
+    def insert(self, min_degree, key):
+        index = len(self.keys) - 1
+        if self.is_leaf:
+            while index >= 0 and self.keys[index] > key:
+                self.keys.insert(index + 1, self.keys[index])
+                index -= 1
+            self.keys.insert(index + 1, key)
+        else:
+            while index >= 0 and self.keys[index] > key:
+                index -= 1
+            if len(self.children[index + 1].keys) == (2 * min_degree - 1):
+                self.children_split(min_degree, self.children[index + 1], index + 1)
+                if self.keys[index + 1] < key:
+                    index += 1
+            self.children[index + 1].insert(min_degree, key)
 
     def __str__(self, level=0):
         ret = "\t" * level + repr(self.keys) + "\n"
@@ -33,15 +77,7 @@ class BTreeNode(object):
         return ret
 
     def __repr__(self):
-        return self.keys
-
-    # if self.is_leaf:
-    #     return 'Leaf node with\n\tkeys: {0}\n\tand children: {1}\n'.format(self.keys,
-    #                                                                        [child.keys for child in self.children])
-    # else:
-    #     return 'Internal node with\n\tkeys: {0}\n\tand children with keys: {1}\n'.format(self.keys,
-    #                                                                                      [child.keys for child in
-    #                                                                                       self.children])
+        return str(self.keys)
 
 
 """
@@ -64,8 +100,8 @@ class BTree(object):
     """
 
     def __init__(self, min_degree):
-        self.root = BTreeNode(True)
         self.min_degree = min_degree
+        self.root = None
 
     def __str__(self):
         return str(self.root)
@@ -97,86 +133,65 @@ class BTree(object):
             return self.search(key, self.root)
 
     """
-    Method to split a given node by child index
-    * node - node, which should be splitted
-    * index - child index 
-    """
-
-    def _children_split(self, node, index):
-        min_degree = self.min_degree
-        child = node.children[index]
-        new_node = BTreeNode(child.is_leaf)
-        # insert new node as a child to given node
-        node.children.insert(index + 1, new_node)
-        # insert child's middle key into node keys
-        node.keys.insert(index, child.keys[min_degree - 1])
-        # put child's right keys to new node
-        new_node.keys = child.keys[min_degree: 2 * min_degree - 1]
-        # reduce child's keys only to left keys
-        child.keys = child.keys[0: min_degree - 1]
-
-        # splitting child's children if child is not leaf node
-        if not child.is_leaf:
-            new_node.children = child.children[min_degree: 2 * min_degree]
-            child.children = child.children[0: min_degree - 1]
-
-    """
-    Method to insert a key into a not full node
-    * node - node, in which the key is inserted
-    * key - key for insertion
-    """
-
-    def _insert(self, node, key):
-        index = len(node.keys) - 1
-        # if node is leaf node, then just insert a key
-        if node.is_leaf:
-            node.keys.append(0)
-            # while key is less than current indexed element, shift all elements right and decrement index
-            while index >= 0 and key < node.keys[index]:
-                node.keys[index + 1] = node.keys[index]
-                index -= 1
-            # inserting key on next element (if current is less than 'key' or index is 0)
-            node.keys[index + 1] = key
-        # otherwise, insert a new node and then insert a key
-        else:
-            # decreasing index
-            while index >= 0 and key < node.keys[index]:
-                index -= 1
-            if index == 0 and len(node.children) > 2:
-                index += 1
-            # if child is full, split the node
-            if len(node.children[index].keys) == (2 * self.min_degree - 1):
-                self._children_split(node, index)
-                if key > node.keys[index]:
-                    index += 1
-            # insert key to the child node
-            self._insert(node.children[index], key)
-
-    """
     Insert key into tree
     * key - term, which should be inserted
     """
-
     def insert(self, key):
-        root = self.root
-        # if condition 2 is violated, we should split the node
-        if len(root.keys) == (2 * self.min_degree - 1):
-            new_node = BTreeNode(False)
-            self.root = new_node
-            # insert current root as a child for new node
-            new_node.children.insert(0, root)
-            # splitting new node
-            self._children_split(new_node, 0)
-            # inserting key to new node
-            self._insert(new_node, key)
-        # if condition 2 holds, insert key into a root node
+        if self.root is None:
+            self.root = BTreeNode(self.min_degree, True)
+            self.root.keys.append(key)
         else:
-            self._insert(root, key)
+            # if condition 2 is violated, we should split the node
+            if len(self.root.keys) == (2 * self.min_degree - 1):
+                new_node = BTreeNode(self.min_degree, False)
+                # insert current root as a child for new node
+                new_node.children.insert(0, self.root)
+                # splitting new node
+                new_node.children_split(self.min_degree, self.root, 0)
+                index = 0
+                if new_node.keys[0] < key:
+                    index += 1
+                new_node.children[index].insert(self.min_degree, key)
+                self.root = new_node
+            # if condition 2 holds, insert key into a root node
+            else:
+                self.root.insert(self.min_degree, key)
 
 
-b_tree = BTree(2)
-for i in range(0, 100):
-    b_tree.insert(randint(100, 10000))
-print(str(b_tree) + '\n')
-# result = b_tree.search(10, None)
-# print(result)
+def b_tree_build_index(long_list):
+    b_tree = BTree(16)
+    for i in long_list:
+        b_tree.insert(i)
+    return b_tree
+
+
+# generate a list L of items with len(L) = 20 000 # each item has a key() and data() methods
+list_size = 20000
+a_long_list = [x for x in range(0, list_size)]
+
+# a random item from the list (L.index(item) > len(L) / 2)
+item = a_long_list[randint(0, 20000)]
+
+
+# a naive sequential search for baseline perfomance check
+def naive_search(l, item):
+    for i in l:
+        if i == item:
+            return i
+
+
+# measure naive time
+start = time.time()
+naive_search(a_long_list, item)
+end = time.time()
+t_no_idx = end - start
+# build index on list
+idx_set = b_tree_build_index(a_long_list)
+# measure index lookup time
+start = time.time()
+idx_set.search(item, None)
+end = time.time()
+t_idx = end - start
+print(t_idx < t_no_idx)
+# make sure that indexed operation is faster
+assert t_idx < t_no_idx, 'Your implementation sucks!'
